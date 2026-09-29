@@ -119,6 +119,7 @@ async def benchmark(
     retain_content=False,
     evaluate=independent_evaluate,
     telemetry=None,
+    executor=None,
 ):
     fixture = load_task(task["split"], task["id"])
     if task != fixture:
@@ -154,7 +155,7 @@ async def benchmark(
         meter.emit(kind, payload)
 
     try:
-        await run(adapter, tools, config, state, emit)
+        await (executor or run)(adapter, tools, config, state, emit)
         correctness = evaluate(task, state.output)
     except asyncio.CancelledError:
         raise  # Caller owns lifecycle cancellation and retained state.
