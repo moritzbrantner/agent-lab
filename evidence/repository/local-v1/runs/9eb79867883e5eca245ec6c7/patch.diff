@@ -1,0 +1,12 @@
+--- a/runtime.py
++++ b/runtime.py
+@@ -157,6 +157,9 @@
+                     state.retries += 1
+                     emit("retry", {"reason": str(error), "attempt": attempt + 1})
+                     await asyncio.sleep(config.retry_delay * 2**attempt)
++                except Exception, asyncio.CancelledError:
++                    state.input_tokens = state.output_tokens = None
++                    raise
+             state.steps += 1
+             emit("model_response", asdict(reply))
+             for name in ("input_tokens", "output_tokens"):

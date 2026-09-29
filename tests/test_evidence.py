@@ -272,3 +272,48 @@ class EvidenceTests(unittest.TestCase):
         self.assertNotIn(
             "fixture-secret-do-not-retain", (root / "trace.json").read_text()
         )
+
+    def test_real_repository_patch_evidence_and_replay(self):
+        from agent_lab.experiments import digest
+        from agent_lab.runtime import AgentConfig, AgentState, run
+        from agent_lab.trace import Replay
+
+        root = ROOT / "evidence/repository/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(results), 10)
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        report = json.loads((root / "report.json").read_text())
+        self.assertEqual(report["reference-fixture"]["passed"], 5)
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            trace = load_trace(run_root / "trace.json", artifact_root=run_root)
+            verification = json.loads((run_root / "verification.json").read_text())
+            self.assertEqual(verification["before"]["status"], "fail")
+            if result["configuration"]["backend"] == "fixture":
+                replay = Replay(trace)
+                state = AgentState(
+                    "replay task uses recorded configuration and request"
+                )
+                first = next(e for e in trace["events"] if e["kind"] == "model_request")
+                state.task = trace["payloads"][first["content_ref"]]["messages"][0][
+                    "content"
+                ]
+                import asyncio
+
+                asyncio.run(
+                    run(
+                        replay,
+                        replay.tools(),
+                        AgentConfig(**result["configuration"]),
+                        state,
+                    )
+                )
+                replay.assert_consumed()
+                self.assertEqual(state.output, verification["agent_output"])
+                self.assertEqual(state.tool_calls, result["work"]["tool_calls"])
