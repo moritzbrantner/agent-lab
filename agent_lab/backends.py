@@ -98,6 +98,7 @@ class OllamaAdapter:
                 "Backend transport failed; completion unknown"
             ) from error
         usage = {
+            "model_calls": 1,
             "input_tokens": value.get("prompt_eval_count"),
             "output_tokens": value.get("eval_count"),
             "measurements": {
