@@ -22,3 +22,29 @@ class EvidenceTests(unittest.TestCase):
                 self.assertEqual(trace["artifacts"], result["artifacts"])
                 self.assertFalse(trace["replayable"])
                 self.assertFalse(list(Path(run_root).glob("*.content.json")))
+
+    def test_recorded_context_experiment_preserves_negative_results(self):
+        from agent_lab.context_experiment import context_report
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/context/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        report = context_report(results)
+        self.assertEqual(report, json.loads((root / "report.json").read_text()))
+        self.assertFalse(report[0]["correctness_parity"])
+        self.assertEqual(report[1]["candidate"]["score"]["mean"], 1)
+        for result in [*results, json.loads((root / "cold-result.json").read_text())]:
+            run_root = root / "runs" / result["run_id"]
+            self.assertEqual(
+                load_trace(run_root / "trace.json", artifact_root=run_root)[
+                    "artifacts"
+                ],
+                result["artifacts"],
+            )

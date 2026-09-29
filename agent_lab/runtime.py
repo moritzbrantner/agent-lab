@@ -6,6 +6,8 @@ import inspect
 from dataclasses import asdict, dataclass, field
 from typing import Protocol
 
+from agent_lab.context import project_context
+
 
 class RuntimeFailure(Exception):
     """A permanent runtime or tool failure."""
@@ -31,9 +33,12 @@ class AgentConfig:
     max_tool_calls: int = 16
     request_timeout: float = 60
     retry_delay: float = 0.1
+    context_policy: str = "full"
     options: dict = field(default_factory=dict)
 
     def __post_init__(self):
+        if self.context_policy not in ("full", "retained", "relevance"):
+            raise ValueError("Unknown context policy")
         if min(self.max_steps, self.max_output_tokens, self.context_size) < 1:
             raise ValueError("Step, token and context budgets must be positive")
         if min(self.max_retries, self.max_tool_calls, self.retry_delay) < 0:
@@ -139,6 +144,7 @@ class AgentState:
     input_tokens: int | None = 0
     output_tokens: int | None = 0
     pending_calls: list[dict] = field(default_factory=list)
+    working_memory: list[dict] = field(default_factory=list)
 
 
 def _ignore_event(kind, payload):
@@ -157,14 +163,21 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
     emit("state", {"status": state.status, "configuration": asdict(config)})
     try:
         while state.steps < config.max_steps:
+            messages = project_context(state, config.context_policy)
+            emit(
+                "context",
+                {
+                    "policy": config.context_policy,
+                    "message_count": len(messages),
+                    "retained_tools": len(state.working_memory),
+                },
+            )
             for attempt in range(config.max_retries + 1):
                 state.model_calls += 1
-                emit("model_request", {"messages": copy.deepcopy(state.messages)})
+                emit("model_request", {"messages": copy.deepcopy(messages)})
                 try:
                     async with asyncio.timeout(config.request_timeout):
-                        reply = await adapter.complete(
-                            copy.deepcopy(state.messages), config
-                        )
+                        reply = await adapter.complete(copy.deepcopy(messages), config)
                     break
                 except TransientModelError as error:
                     if state.retries >= config.max_retries:
@@ -218,6 +231,13 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                     async with asyncio.timeout(config.request_timeout):
                         value = await value
                 state.tool_calls += 1
+                state.working_memory.append(
+                    {
+                        "name": call.name,
+                        "arguments": copy.deepcopy(call.arguments),
+                        "result": copy.deepcopy(value),
+                    }
+                )
                 state.messages.append(
                     {"role": "tool", "name": call.name, "content": value}
                 )
