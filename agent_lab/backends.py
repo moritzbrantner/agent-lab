@@ -6,7 +6,13 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
-from agent_lab.runtime import Reply, RuntimeFailure, TransientModelError
+from agent_lab.experiments import canonical
+from agent_lab.runtime import (
+    Reply,
+    ResponseFailure,
+    RuntimeFailure,
+    TransientModelError,
+)
 
 RESPONSE_SCHEMA = {
     "type": "object",
@@ -39,6 +45,26 @@ class OllamaAdapter:
             raise ValueError("Ollama endpoint must be loopback HTTP")
         self.endpoint = endpoint.rstrip("/")
 
+    @staticmethod
+    def _message(message):
+        if message["role"] == "tool":
+            return {
+                "role": "user",
+                "content": "Tool "
+                + message["name"]
+                + " returned: "
+                + canonical(message["content"])
+                + ". Continue with a JSON reply.",
+            }
+        if message.get("calls"):
+            return {
+                "role": message["role"],
+                "content": canonical(
+                    {"content": message["content"], "calls": message["calls"]}
+                ),
+            }
+        return {"role": message["role"], "content": message["content"]}
+
     def _request(self, messages, config):
         options = {
             **config.options,
@@ -52,17 +78,7 @@ class OllamaAdapter:
             "stream": False,
             "format": RESPONSE_SCHEMA,
             "options": options,
-            "messages": [
-                {
-                    "role": message["role"],
-                    "content": (
-                        message["content"]
-                        if isinstance(message["content"], str)
-                        else json.dumps(message["content"])
-                    ),
-                }
-                for message in messages
-            ],
+            "messages": [self._message(message) for message in messages],
         }
         request = urllib.request.Request(
             self.endpoint + "/api/chat",
@@ -81,26 +97,23 @@ class OllamaAdapter:
             raise RuntimeFailure(
                 "Backend transport failed; completion unknown"
             ) from error
+        usage = {
+            "input_tokens": value.get("prompt_eval_count"),
+            "output_tokens": value.get("eval_count"),
+            "measurements": {
+                key: value[key] / 1e9
+                for key in ("load_duration", "prompt_eval_duration", "eval_duration")
+                if key in value
+            },
+        }
         try:
             parsed = json.loads(value["message"]["content"])
-            parsed.update(
-                {
-                    "input_tokens": value.get("prompt_eval_count"),
-                    "output_tokens": value.get("eval_count"),
-                    "measurements": {
-                        key: value[key] / 1e9
-                        for key in (
-                            "load_duration",
-                            "prompt_eval_duration",
-                            "eval_duration",
-                        )
-                        if key in value
-                    },
-                }
-            )
+            if not isinstance(parsed, dict):
+                raise RuntimeFailure("Backend reply must be an object")
+            parsed.update(usage)
             return Reply.parse(parsed)
-        except (KeyError, ValueError, TypeError) as error:
-            raise RuntimeFailure("Malformed backend response") from error
+        except (KeyError, ValueError, TypeError, RuntimeFailure) as error:
+            raise ResponseFailure("Malformed backend response", **usage) from error
 
     async def complete(self, messages, config):
         # Socket work is finite. Cancellation discards the result; no tool executes.

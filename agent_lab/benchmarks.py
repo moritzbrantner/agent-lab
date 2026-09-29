@@ -59,10 +59,17 @@ def tool_registry():
 
 
 def prompt_for(task):
+    signatures = {
+        "sum": "sum(numbers: array of numbers)",
+        "sort": "sort(records: array of objects with id and rank)",
+        "lookup": "lookup(facts: object, key: string)",
+        "repair": "repair(source: string)",
+        "index": "index(changes: array of put/delete operations)",
+    }
     return (
         "Return a JSON reply with content (string) and calls (array of objects with "
         "name and arguments). Use only these tools: "
-        + canonical(task["tools"])
+        + canonical([signatures[name] for name in task["tools"]])
         + ". When finished return calls: [] and the final answer in content. "
         + task["instruction"]
         + "\nInput: "

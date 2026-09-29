@@ -21,6 +21,7 @@ class AgentConfig:
     model_digest: str = "fixture-v1"
     backend: str = "fixture"
     backend_version: str = "1"
+    quantization: str = "none"
     seed: int = 0
     temperature: float = 0
     context_size: int = 4096
@@ -81,6 +82,20 @@ class Reply:
             value.get("input_tokens"),
             value.get("output_tokens"),
             value.get("measurements", {}),
+        )
+
+
+class ResponseFailure(RuntimeFailure):
+    """A completed but unusable response, retaining its consumed resources."""
+
+    def __init__(
+        self, message, *, input_tokens=None, output_tokens=None, measurements=None
+    ):
+        super().__init__(message)
+        self.usage = Reply(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            measurements=measurements or {},
         )
 
 
@@ -157,6 +172,20 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                     state.retries += 1
                     emit("retry", {"reason": str(error), "attempt": attempt + 1})
                     await asyncio.sleep(config.retry_delay * 2**attempt)
+                except ResponseFailure as error:
+                    state.steps += 1
+                    emit("model_response", {**asdict(error.usage), "failure": True})
+                    for name in ("input_tokens", "output_tokens"):
+                        old, new = getattr(state, name), getattr(error.usage, name)
+                        setattr(
+                            state,
+                            name,
+                            old + new if old is not None and new is not None else None,
+                        )
+                    raise
+                except Exception, asyncio.CancelledError:
+                    state.input_tokens = state.output_tokens = None
+                    raise
             state.steps += 1
             emit("model_response", asdict(reply))
             for name in ("input_tokens", "output_tokens"):

@@ -4,7 +4,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from agent_lab.backends import OllamaAdapter
-from agent_lab.runtime import AgentConfig, RuntimeFailure
+from agent_lab.runtime import AgentConfig, ResponseFailure, RuntimeFailure
 
 
 class BackendTests(unittest.IsolatedAsyncioTestCase):
@@ -24,6 +24,14 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
                         "eval_duration": 100,
                     }
                 ).encode()
+                if captured[-1]["messages"][0]["content"] == "bad":
+                    payload = json.dumps(
+                        {
+                            "message": {"content": '{"calls":null}'},
+                            "prompt_eval_count": 12,
+                            "eval_count": 256,
+                        }
+                    ).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
@@ -47,6 +55,33 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(captured[0]["options"]["seed"], 42)
                 self.assertEqual(captured[0]["options"]["num_predict"], 17)
                 self.assertFalse(captured[0]["stream"])
+                await adapter.complete(
+                    [
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "calls": [
+                                {"name": "sum", "arguments": {"numbers": [2, 3]}}
+                            ],
+                        },
+                        {"role": "tool", "name": "sum", "content": 5},
+                    ],
+                    AgentConfig(),
+                )
+                self.assertEqual(
+                    json.loads(captured[1]["messages"][0]["content"])["calls"][0][
+                        "arguments"
+                    ],
+                    {"numbers": [2, 3]},
+                )
+                self.assertIn(
+                    "Tool sum returned: 5", captured[1]["messages"][1]["content"]
+                )
+                with self.assertRaises(ResponseFailure) as failure:
+                    await adapter.complete(
+                        [{"role": "user", "content": "bad"}], AgentConfig()
+                    )
+                self.assertEqual(failure.exception.usage.output_tokens, 256)
             finally:
                 server.shutdown()
                 thread.join()

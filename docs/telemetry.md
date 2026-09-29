@@ -5,8 +5,8 @@ measurement overhead), harness CPU time, tool-boundary duration, and backend
 reported prompt/generation/model-load durations. Failed or unsupported inference
 timing remains null; it is never assumed zero. Work counters remain independent.
 
-RAM is the maximum sampled sum of harness and all visible Ollama process RSS.
-VRAM is the maximum sampled NVIDIA allocation for those Ollama processes.
+RAM is the maximum sampled sum of harness and all visible Ollama process-tree RSS.
+VRAM is the maximum sampled NVIDIA allocation for that Ollama process tree.
 Samples occur at start/end and every 200ms, so short peaks may be missed. Sources
 explicitly identify this as sampled evidence, including scope; shared RSS pages
 may be counted twice. Use a quiescent dedicated backend for baseline experiments.

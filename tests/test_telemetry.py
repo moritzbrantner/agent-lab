@@ -1,9 +1,14 @@
 import unittest
 
-from agent_lab.telemetry import EnergyCounter, Telemetry, hardware_profile
+from agent_lab.telemetry import EnergyCounter, Telemetry, hardware_profile, process_tree
 
 
 class TelemetryTests(unittest.TestCase):
+    def test_backend_children_are_included_without_unrelated_processes(self):
+        self.assertEqual(
+            process_tree({10}, {10: 1, 11: 10, 12: 11, 20: 1}), {10, 11, 12}
+        )
+
     def test_phase_times_memory_and_unknown_energy_are_separate(self):
         now = [0.0]
         meter = Telemetry(
