@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "index-changes",
+  "version": 1,
+  "split": "development",
+  "category": "tool-transformation",
+  "input": {
+    "changes": [
+      {
+        "op": "put",
+        "record": {
+          "id": "b",
+          "rank": 1
+        }
+      },
+      {
+        "op": "put",
+        "record": {
+          "id": "a",
+          "rank": 1
+        }
+      },
+      {
+        "op": "put",
+        "record": {
+          "id": "b",
+          "rank": 0
+        }
+      },
+      {
+        "op": "delete",
+        "id": "a"
+      },
+      {
+        "op": "delete",
+        "id": "missing"
+      }
+    ]
+  },
+  "tools": [
+    "index"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "index",
+        "arguments": {
+          "changes": [
+            {
+              "op": "put",
+              "record": {
+                "id": "b",
+                "rank": 1
+              }
+            },
+            {
+              "op": "put",
+              "record": {
+                "id": "a",
+                "rank": 1
+              }
+            },
+            {
+              "op": "put",
+              "record": {
+                "id": "b",
+                "rank": 0
+              }
+            },
+            {
+              "op": "delete",
+              "id": "a"
+            },
+            {
+              "op": "delete",
+              "id": "missing"
+            }
+          ]
+        }
+      }
+    ]
+  ],
+  "expected": "[[{\"id\":\"b\",\"rank\":1}],[{\"id\":\"a\",\"rank\":1},{\"id\":\"b\",\"rank\":1}],[{\"id\":\"b\",\"rank\":0},{\"id\":\"a\",\"rank\":1}],[{\"id\":\"b\",\"rank\":0}],[{\"id\":\"b\",\"rank\":0}]]",
+  "instruction": "Use index with changes. Final content is compact JSON with sorted object keys containing the entire sequence of observable states.",
+  "evaluator": "exact-v1",
+  "reference": "full-sort-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

@@ -10,7 +10,9 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+from agent_lab.evaluators import independent_evaluate
 from agent_lab.experiments import MEASUREMENTS, ROOT, canonical, digest, validate_result
+from agent_lab.oracles import incremental_sequence
 from agent_lab.runtime import AgentState, Reply, SequenceAdapter, ToolCall, run
 from agent_lab.trace import Trace, atomic_json
 
@@ -41,6 +43,7 @@ def discover(split="development"):
 
 def tool_registry():
     return {
+        "index": lambda args: incremental_sequence(args["changes"]),
         "sum": lambda args: sum(args["numbers"]),
         "sort": lambda args: sorted(
             args["records"], key=lambda item: (item["rank"], item["id"])
@@ -91,15 +94,6 @@ def fixture_adapter(task):
     return SequenceAdapter(replies)
 
 
-def exact_evaluate(task, output):
-    passed = output == task["expected"]
-    return {
-        "status": "pass" if passed else "fail",
-        "score": int(passed),
-        "evaluator": task["evaluator"],
-    }
-
-
 async def benchmark(
     task,
     adapter,
@@ -110,7 +104,7 @@ async def benchmark(
     software=None,
     output_root=None,
     retain_content=False,
-    evaluate=exact_evaluate,
+    evaluate=independent_evaluate,
 ):
     fixture = load_task(task["split"], task["id"])
     if task != fixture:
