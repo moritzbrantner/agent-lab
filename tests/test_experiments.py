@@ -75,8 +75,10 @@ class ExperimentTests(unittest.TestCase):
     def test_repeat_summary_reports_variance_and_missing_samples(self):
         a, b = result(10), copy.deepcopy(result(20))
         b["protocol"]["repeat"] = 1
+        b["configuration"]["seed"] = 8
         report = summarize([a, b])
         self.assertEqual(report["generated_tokens"]["mean"], 15)
         self.assertEqual(report["generated_tokens"]["samples"], 2)
+        self.assertEqual(report["sampling_seeds"], [7, 8])
         self.assertIsNone(report["wall_seconds"]["mean"])
         self.assertEqual(digest({"a": 1, "b": 2}), digest({"b": 2, "a": 1}))
