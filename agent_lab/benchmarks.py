@@ -120,6 +120,7 @@ async def benchmark(
     evaluate=independent_evaluate,
     telemetry=None,
     executor=None,
+    parent_run_id=None,
 ):
     fixture = load_task(task["split"], task["id"])
     if task != fixture:
@@ -143,9 +144,16 @@ async def benchmark(
         }
     )[:24]
     trace = Trace(
-        run_id, task["id"], digest(config_identity), retain_content=retain_content
+        run_id,
+        task["id"],
+        digest(config_identity),
+        retain_content=retain_content,
+        parent_run_id=parent_run_id,
     )
-    state = AgentState(prompt_for(task, config.context_policy))
+    prompt = prompt_for(task, config.context_policy)
+    if config.feedback:
+        prompt += "\nFeedback: " + config.feedback
+    state = AgentState(prompt)
     tools = {name: tool_registry()[name] for name in task["tools"]}
     meter = telemetry or Telemetry(energy=EnergyCounter.discover())
     meter.start()

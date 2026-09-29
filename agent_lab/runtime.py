@@ -34,6 +34,7 @@ class AgentConfig:
     request_timeout: float = 60
     retry_delay: float = 0.1
     context_policy: str = "full"
+    feedback: str = ""
     options: dict = field(default_factory=dict)
 
     def __post_init__(self):
