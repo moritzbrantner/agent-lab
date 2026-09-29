@@ -21,20 +21,36 @@ def _read_rss(pid):
     return None
 
 
+def process_tree(roots, parents):
+    result = set(roots)
+    while True:
+        expanded = result | {pid for pid, parent in parents.items() if parent in result}
+        if expanded == result:
+            return result
+        result = expanded
+
+
 def memory_snapshot():
     own = _read_rss(os.getpid())
     if own is None:
         return None, None
     backend_pids = set()
+    parents = {}
     for path in Path("/proc").iterdir():
         if not path.name.isdigit():
             continue
         try:
             command = (path / "cmdline").read_bytes().split(b"\0")
+            parents[int(path.name)] = next(
+                int(line.split()[1])
+                for line in (path / "status").read_text().splitlines()
+                if line.startswith("PPid:")
+            )
             if command and Path(os.fsdecode(command[0])).name == "ollama":
                 backend_pids.add(int(path.name))
         except OSError:
             continue  # Processes may disappear between enumeration and reading.
+    backend_pids = process_tree(backend_pids, parents)
     ram = own + sum(_read_rss(pid) or 0 for pid in backend_pids)
     executable = shutil.which("nvidia-smi")
     if executable is None:
@@ -206,11 +222,11 @@ class Telemetry:
         for key, source in (
             (
                 "peak_ram_bytes",
-                "sampled:/proc/VmRSS/harness+all-ollama-processes/200ms",
+                "sampled:/proc/VmRSS/harness+ollama-process-tree/200ms",
             ),
             (
                 "peak_vram_bytes",
-                "sampled:nvidia-smi/all-ollama-process-allocations/200ms",
+                "sampled:nvidia-smi/ollama-process-tree-allocations/200ms",
             ),
         ):
             if self.values[key] is not None:

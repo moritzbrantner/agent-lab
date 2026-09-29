@@ -21,6 +21,7 @@ class AgentConfig:
     model_digest: str = "fixture-v1"
     backend: str = "fixture"
     backend_version: str = "1"
+    quantization: str = "none"
     seed: int = 0
     temperature: float = 0
     context_size: int = 4096

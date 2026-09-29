@@ -47,6 +47,28 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(captured[0]["options"]["seed"], 42)
                 self.assertEqual(captured[0]["options"]["num_predict"], 17)
                 self.assertFalse(captured[0]["stream"])
+                await adapter.complete(
+                    [
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "calls": [
+                                {"name": "sum", "arguments": {"numbers": [2, 3]}}
+                            ],
+                        },
+                        {"role": "tool", "name": "sum", "content": 5},
+                    ],
+                    AgentConfig(),
+                )
+                self.assertEqual(
+                    json.loads(captured[1]["messages"][0]["content"])["calls"][0][
+                        "arguments"
+                    ],
+                    {"numbers": [2, 3]},
+                )
+                self.assertIn(
+                    "Tool sum returned: 5", captured[1]["messages"][1]["content"]
+                )
             finally:
                 server.shutdown()
                 thread.join()

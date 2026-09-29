@@ -6,6 +6,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from agent_lab.experiments import canonical
 from agent_lab.runtime import Reply, RuntimeFailure, TransientModelError
 
 RESPONSE_SCHEMA = {
@@ -39,6 +40,26 @@ class OllamaAdapter:
             raise ValueError("Ollama endpoint must be loopback HTTP")
         self.endpoint = endpoint.rstrip("/")
 
+    @staticmethod
+    def _message(message):
+        if message["role"] == "tool":
+            return {
+                "role": "user",
+                "content": "Tool "
+                + message["name"]
+                + " returned: "
+                + canonical(message["content"])
+                + ". Continue with a JSON reply.",
+            }
+        if message.get("calls"):
+            return {
+                "role": message["role"],
+                "content": canonical(
+                    {"content": message["content"], "calls": message["calls"]}
+                ),
+            }
+        return {"role": message["role"], "content": message["content"]}
+
     def _request(self, messages, config):
         options = {
             **config.options,
@@ -52,17 +73,7 @@ class OllamaAdapter:
             "stream": False,
             "format": RESPONSE_SCHEMA,
             "options": options,
-            "messages": [
-                {
-                    "role": message["role"],
-                    "content": (
-                        message["content"]
-                        if isinstance(message["content"], str)
-                        else json.dumps(message["content"])
-                    ),
-                }
-                for message in messages
-            ],
+            "messages": [self._message(message) for message in messages],
         }
         request = urllib.request.Request(
             self.endpoint + "/api/chat",
@@ -83,6 +94,8 @@ class OllamaAdapter:
             ) from error
         try:
             parsed = json.loads(value["message"]["content"])
+            if not isinstance(parsed, dict):
+                raise RuntimeFailure("Backend reply must be an object")
             parsed.update(
                 {
                     "input_tokens": value.get("prompt_eval_count"),
