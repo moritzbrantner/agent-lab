@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "held-sum",
+  "version": 1,
+  "split": "held-out",
+  "category": "structured-reasoning",
+  "input": {
+    "numbers": [
+      101,
+      -19,
+      31
+    ]
+  },
+  "tools": [],
+  "fixture_plan": [],
+  "expected": "113",
+  "instruction": "Compute the sum of the numbers. Final content is the decimal integer.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

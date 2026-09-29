@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-lab:task:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "held-out"
+      ]
+    },
+    "category": {
+      "enum": [
+        "structured-reasoning",
+        "tool-transformation",
+        "repository-modification",
+        "retrieval",
+        "long-running"
+      ]
+    },
+    "input": {
+      "type": "object"
+    },
+    "tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "sum",
+          "sort",
+          "lookup",
+          "repair"
+        ]
+      }
+    },
+    "fixture_plan": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "name",
+            "arguments"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "arguments": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "expected": {
+      "type": "string"
+    },
+    "instruction": {
+      "type": "string"
+    },
+    "evaluator": {
+      "const": "exact-v1"
+    },
+    "reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "steps",
+        "tool_calls"
+      ],
+      "properties": {
+        "steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "repeat_policy": {
+      "type": "object",
+      "required": [
+        "deterministic",
+        "stochastic"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": 1
+        },
+        "stochastic": {
+          "type": "integer",
+          "minimum": 5
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "version",
+    "split",
+    "category",
+    "input",
+    "tools",
+    "fixture_plan",
+    "expected",
+    "instruction",
+    "evaluator",
+    "reference",
+    "budgets",
+    "repeat_policy"
+  ]
+}
