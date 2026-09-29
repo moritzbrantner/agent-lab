@@ -190,3 +190,26 @@ class EvidenceTests(unittest.TestCase):
         )
         self.assertEqual(archive.frontier(), report["frontier"])
         self.assertEqual(report["frontier"][0]["entries"], [])
+
+    def test_distilled_artifact_provenance_and_cost_parity(self):
+        from agent_lab.distillation import verify_artifact
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/distillation/local-v1"
+        artifact = json.loads((root / "distilled-artifact.json").read_text())
+        verify_artifact(artifact)
+        report = json.loads((root / "report.json").read_text())
+        self.assertTrue(report["correctness_parity"])
+        self.assertEqual(report["capability"]["generated_tokens"]["mean"], 0)
+        self.assertGreater(report["reference"]["generated_tokens"]["mean"], 0)
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            load_trace(run_root / "trace.json", artifact_root=run_root)
