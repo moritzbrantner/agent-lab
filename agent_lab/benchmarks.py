@@ -3,7 +3,6 @@
 import asyncio
 import copy
 import json
-import platform
 import re
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -11,9 +10,15 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from agent_lab.evaluators import independent_evaluate
-from agent_lab.experiments import MEASUREMENTS, ROOT, canonical, digest, validate_result
+from agent_lab.experiments import ROOT, canonical, digest, validate_result
 from agent_lab.oracles import incremental_sequence
 from agent_lab.runtime import AgentState, Reply, SequenceAdapter, ToolCall, run
+from agent_lab.telemetry import (
+    EnergyCounter,
+    Telemetry,
+    hardware_profile,
+    software_identity,
+)
 from agent_lab.trace import Trace, atomic_json
 
 
@@ -105,6 +110,7 @@ async def benchmark(
     output_root=None,
     retain_content=False,
     evaluate=independent_evaluate,
+    telemetry=None,
 ):
     fixture = load_task(task["split"], task["id"])
     if task != fixture:
@@ -116,16 +122,31 @@ async def benchmark(
         max_tool_calls=min(config.max_tool_calls, task["budgets"]["tool_calls"]),
     )
     config_identity = asdict(config)
+    hardware = hardware or hardware_profile()
+    software = software or software_identity()
     run_id = digest(
-        {"task": digest(task), "configuration": config_identity, "repeat": repeat}
+        {
+            "task": digest(task),
+            "configuration": config_identity,
+            "repeat": repeat,
+            "hardware": hardware,
+            "software": software,
+        }
     )[:24]
     trace = Trace(
         run_id, task["id"], digest(config_identity), retain_content=retain_content
     )
     state = AgentState(prompt_for(task))
     tools = {name: tool_registry()[name] for name in task["tools"]}
+    meter = telemetry or Telemetry(energy=EnergyCounter.discover())
+    meter.start()
+
+    def emit(kind, payload):
+        trace.emit(kind, payload)
+        meter.emit(kind, payload)
+
     try:
-        await run(adapter, tools, config, state, trace.emit)
+        await run(adapter, tools, config, state, emit)
         correctness = evaluate(task, state.output)
     except asyncio.CancelledError:
         raise  # Caller owns lifecycle cancellation and retained state.
@@ -133,6 +154,8 @@ async def benchmark(
         # Experiment boundary retains all failed samples without relabelling them.
         correctness = {"status": "error", "score": None, "evaluator": task["evaluator"]}
         trace.emit("failure", {"category": type(error).__name__})
+    finally:
+        measurements, sources = meter.stop()
     if load_task(task["split"], task["id"]) != fixture:
         raise ValueError("Benchmark fixture changed during run")
     trace.emit("evaluator", correctness)
@@ -146,9 +169,8 @@ async def benchmark(
         },
         "protocol": {"id": task["evaluator"], "split": task["split"], "repeat": repeat},
         "configuration": config_identity,
-        "hardware": hardware or {"profile": "deterministic-fixture"},
-        "software": software
-        or {"python": platform.python_version(), "runtime": "agent-lab-v1"},
+        "hardware": hardware,
+        "software": software,
         "correctness": correctness,
         "work": {
             "input_tokens": state.input_tokens,
@@ -158,10 +180,11 @@ async def benchmark(
             "retries": state.retries,
             "tool_calls": state.tool_calls,
         },
-        "measurements": dict.fromkeys(MEASUREMENTS),
-        "measurement_sources": {},
+        "measurements": measurements,
+        "measurement_sources": sources,
         "artifacts": {},
     }
+    trace.emit("measurements", {"values": measurements, "sources": sources})
     if output_root is not None:
         root = Path(output_root) / run_id
         atomic_json(root / "output.json", {"content": state.output})
