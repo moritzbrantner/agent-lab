@@ -125,3 +125,27 @@ class EvidenceTests(unittest.TestCase):
                     child = run_root / "candidates" / candidate["run_id"]
                     trace = load_trace(child / "trace.json", artifact_root=child)
                     self.assertEqual(trace["parent_run_id"], result["run_id"])
+
+    def test_inference_features_have_comparable_evidence(self):
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/inference/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(results), 25)
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        report = json.loads((root / "report.json").read_text())
+        self.assertEqual(
+            set(report["comparisons"]),
+            {"small-q4-gpu", "small-q8-gpu", "medium-context-2048"},
+        )
+        self.assertEqual(report["negotiation"]["speculation"]["status"], "unavailable")
+        for result in results:
+            validate_result(result)
+            run_root = root / "runs" / result["run_id"]
+            load_trace(run_root / "trace.json", artifact_root=run_root)
