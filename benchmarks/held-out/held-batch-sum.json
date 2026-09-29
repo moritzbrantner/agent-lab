@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "held-batch-sum",
+  "version": 1,
+  "split": "held-out",
+  "category": "long-running",
+  "input": {
+    "batches": [
+      [
+        11,
+        -2,
+        4
+      ],
+      [
+        -7,
+        12
+      ],
+      [
+        9,
+        0,
+        -3,
+        5
+      ]
+    ]
+  },
+  "tools": [
+    "sum"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            11,
+            -2,
+            4
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            -7,
+            12
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            9,
+            0,
+            -3,
+            5
+          ]
+        }
+      }
+    ]
+  ],
+  "expected": "29",
+  "instruction": "Call sum once per batch, then total the tool results. Final content is the decimal integer.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "id": "held-retrieve-fact",
+  "version": 1,
+  "split": "held-out",
+  "category": "retrieval",
+  "input": {
+    "facts": {
+      "station": "delta",
+      "route": "amber",
+      "platform": "north",
+      "ticket": "blue"
+    },
+    "key": "station"
+  },
+  "tools": [
+    "lookup"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "lookup",
+        "arguments": {
+          "facts": {
+            "station": "delta",
+            "route": "amber",
+            "platform": "north",
+            "ticket": "blue"
+          },
+          "key": "station"
+        }
+      }
+    ]
+  ],
+  "expected": "delta",
+  "instruction": "Look up the requested key using lookup. Final content is its exact value.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

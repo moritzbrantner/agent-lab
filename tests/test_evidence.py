@@ -177,3 +177,16 @@ class EvidenceTests(unittest.TestCase):
         for result in results:
             run_root = root / "runs" / result["run_id"]
             load_trace(run_root / "trace.json", artifact_root=run_root)
+
+    def test_evolutionary_archive_preserves_measured_rejection(self):
+        from agent_lab.archive import Archive
+
+        root = ROOT / "evidence/archive/local-v1"
+        report = json.loads((root / "report.json").read_text())
+        archive = Archive(root)
+        self.assertEqual(archive.read(report["candidate"])["parents"], [report["root"]])
+        self.assertEqual(
+            archive.read(report["candidate"])["decision"]["status"], "reject"
+        )
+        self.assertEqual(archive.frontier(), report["frontier"])
+        self.assertEqual(report["frontier"][0]["entries"], [])
