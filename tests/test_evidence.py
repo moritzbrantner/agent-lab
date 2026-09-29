@@ -257,3 +257,18 @@ class EvidenceTests(unittest.TestCase):
         for result in results:
             run_root = root / "runs" / result["run_id"]
             load_trace(run_root / "trace.json", artifact_root=run_root)
+
+    def test_permission_fixture_is_attributed_and_secret_free(self):
+        root = ROOT / "evidence/permissions/local-v1"
+        report = json.loads((root / "report.json").read_text())
+        self.assertTrue(all(report[key] for key in ("allowed", "denied", "elevated")))
+        self.assertEqual(report["sandbox"]["stdout"].splitlines(), ["False", "True"])
+        trace = load_trace(root / "trace.json", artifact_root=root)
+        authorities = [
+            e["metadata"] for e in trace["events"] if e["kind"] == "authority"
+        ]
+        self.assertTrue(any(e.get("allowed") is False for e in authorities))
+        self.assertTrue(any(e.get("action") == "elevation" for e in authorities))
+        self.assertNotIn(
+            "fixture-secret-do-not-retain", (root / "trace.json").read_text()
+        )
