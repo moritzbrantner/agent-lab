@@ -1,0 +1,1 @@
+{"content":"${sum(completed[0][2]) + sum(completed[1][2]) + sum(completed[2][2])}"}

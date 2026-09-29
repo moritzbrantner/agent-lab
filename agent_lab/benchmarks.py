@@ -9,6 +9,7 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+from agent_lab.context import select_input
 from agent_lab.evaluators import independent_evaluate
 from agent_lab.experiments import ROOT, canonical, digest, validate_result
 from agent_lab.oracles import incremental_sequence
@@ -58,7 +59,7 @@ def tool_registry():
     }
 
 
-def prompt_for(task):
+def prompt_for(task, policy="full"):
     signatures = {
         "sum": "sum(numbers: array of numbers)",
         "sort": "sort(records: array of objects with id and rank)",
@@ -73,7 +74,7 @@ def prompt_for(task):
         + ". When finished return calls: [] and the final answer in content. "
         + task["instruction"]
         + "\nInput: "
-        + canonical(task["input"])
+        + canonical(select_input(task, policy))
     )
 
 
@@ -143,7 +144,7 @@ async def benchmark(
     trace = Trace(
         run_id, task["id"], digest(config_identity), retain_content=retain_content
     )
-    state = AgentState(prompt_for(task))
+    state = AgentState(prompt_for(task, config.context_policy))
     tools = {name: tool_registry()[name] for name in task["tools"]}
     meter = telemetry or Telemetry(energy=EnergyCounter.discover())
     meter.start()
