@@ -14,8 +14,7 @@ retained cold-load task runs. Failures and malformed outputs retain consumed wor
 The medium model passes batch arithmetic and source repair. Exact serialized
 ordering, retrieval and structured final replies expose failures; the 0.5B model
 fails this protocol across all measured tasks. These are baselines, not assistant
-capability claims. CPU offload disabled for model layers still initializes a small
-GPU context in this backend, visible in sampled VRAM.
+capability claims.
 
 See `summary.json` for each task/configuration's mean, sample standard deviation,
 missing counts and exact identities. All public outputs and metadata traces are
