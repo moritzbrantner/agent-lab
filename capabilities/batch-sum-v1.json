@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "batch-sum-v1",
+  "version": 1,
+  "kind": "deterministic-utility",
+  "implementation": "batch_sum",
+  "input_schema": {
+    "type": "object",
+    "required": ["batches"],
+    "additionalProperties": false,
+    "properties": {
+      "batches": {
+        "type": "array",
+        "items": {"type": "array", "items": {"type": "integer"}}
+      }
+    }
+  },
+  "output_schema": {"type": "string", "pattern": "^-?[0-9]+$"},
+  "tests": "tests/test_capabilities.py"
+}

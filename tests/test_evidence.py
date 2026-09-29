@@ -48,3 +48,24 @@ class EvidenceTests(unittest.TestCase):
                 ],
                 result["artifacts"],
             )
+
+    def test_reusable_capability_evidence(self):
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/capabilities/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(results), 10)
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        report = json.loads((root / "report.json").read_text())
+        self.assertTrue(report["correctness_parity"])
+        self.assertEqual(report["capability"]["generated_tokens"]["mean"], 0)
+        self.assertGreater(report["reference"]["generated_tokens"]["mean"], 0)
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            load_trace(run_root / "trace.json", artifact_root=run_root)
