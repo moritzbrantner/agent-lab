@@ -11,7 +11,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from agent_lab.experiments import ROOT, canonical, digest
-from agent_lab.runtime import Reply, TransientModelError
+from agent_lab.runtime import Reply, ResponseFailure, TransientModelError
 
 
 def atomic_json(path, value):
@@ -188,7 +188,15 @@ class Replay:
             and self.events[self.position]["kind"] == "retry"
         ):
             raise TransientModelError(self._next("retry")["reason"])
-        return Reply.parse(self._next("model_response"))
+        payload = self._next("model_response")
+        if payload.get("failure"):
+            raise ResponseFailure(
+                "Recorded malformed response",
+                input_tokens=payload.get("input_tokens"),
+                output_tokens=payload.get("output_tokens"),
+                measurements=payload.get("measurements"),
+            )
+        return Reply.parse(payload)
 
     def tools(self):
         names = {

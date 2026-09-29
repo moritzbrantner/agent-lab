@@ -7,7 +7,12 @@ import urllib.request
 from urllib.parse import urlparse
 
 from agent_lab.experiments import canonical
-from agent_lab.runtime import Reply, RuntimeFailure, TransientModelError
+from agent_lab.runtime import (
+    Reply,
+    ResponseFailure,
+    RuntimeFailure,
+    TransientModelError,
+)
 
 RESPONSE_SCHEMA = {
     "type": "object",
@@ -92,28 +97,23 @@ class OllamaAdapter:
             raise RuntimeFailure(
                 "Backend transport failed; completion unknown"
             ) from error
+        usage = {
+            "input_tokens": value.get("prompt_eval_count"),
+            "output_tokens": value.get("eval_count"),
+            "measurements": {
+                key: value[key] / 1e9
+                for key in ("load_duration", "prompt_eval_duration", "eval_duration")
+                if key in value
+            },
+        }
         try:
             parsed = json.loads(value["message"]["content"])
             if not isinstance(parsed, dict):
                 raise RuntimeFailure("Backend reply must be an object")
-            parsed.update(
-                {
-                    "input_tokens": value.get("prompt_eval_count"),
-                    "output_tokens": value.get("eval_count"),
-                    "measurements": {
-                        key: value[key] / 1e9
-                        for key in (
-                            "load_duration",
-                            "prompt_eval_duration",
-                            "eval_duration",
-                        )
-                        if key in value
-                    },
-                }
-            )
+            parsed.update(usage)
             return Reply.parse(parsed)
-        except (KeyError, ValueError, TypeError) as error:
-            raise RuntimeFailure("Malformed backend response") from error
+        except (KeyError, ValueError, TypeError, RuntimeFailure) as error:
+            raise ResponseFailure("Malformed backend response", **usage) from error
 
     async def complete(self, messages, config):
         # Socket work is finite. Cancellation discards the result; no tool executes.

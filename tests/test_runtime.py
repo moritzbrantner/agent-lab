@@ -6,6 +6,7 @@ from agent_lab.runtime import (
     AgentState,
     FunctionAdapter,
     Reply,
+    ResponseFailure,
     RuntimeFailure,
     SequenceAdapter,
     ToolCall,
@@ -15,6 +16,28 @@ from agent_lab.runtime import (
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rejected_responses_still_count_inference_work(self):
+        def malformed(*args):
+            raise ResponseFailure("bad structure", input_tokens=30, output_tokens=20)
+
+        state = AgentState("test")
+        with self.assertRaises(ResponseFailure):
+            await run(FunctionAdapter(malformed), {}, AgentConfig(), state)
+        self.assertEqual(state.input_tokens, 30)
+        self.assertEqual(state.output_tokens, 20)
+        self.assertEqual(state.model_calls, 1)
+        self.assertEqual(state.status, "failed")
+
+    async def test_unknown_failed_request_usage_is_not_zero(self):
+        def failed(*args):
+            raise RuntimeFailure("transport uncertain")
+
+        state = AgentState("test")
+        with self.assertRaises(RuntimeFailure):
+            await run(FunctionAdapter(failed), {}, AgentConfig(), state)
+        self.assertIsNone(state.input_tokens)
+        self.assertIsNone(state.output_tokens)
+
     async def test_interchangeable_adapters_and_explicit_state(self):
         replies = [Reply(calls=(ToolCall("sum", {"numbers": [2, 3]}),)), Reply("5")]
         for adapter in (
