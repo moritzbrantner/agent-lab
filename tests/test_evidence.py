@@ -149,3 +149,31 @@ class EvidenceTests(unittest.TestCase):
             validate_result(result)
             run_root = root / "runs" / result["run_id"]
             load_trace(run_root / "trace.json", artifact_root=run_root)
+
+    def test_self_proposed_mutation_is_auditable_and_guarded(self):
+        from agent_lab.experiments import digest
+        from agent_lab.improvement import decide
+
+        root = ROOT / "evidence/improvement/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(results), 70)
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        proposal = json.loads((root / "proposal.json").read_text())
+        self.assertEqual(
+            proposal["mutation"]["changes"], {"context_policy": "relevance"}
+        )
+        self.assertGreater(proposal["work"]["output_tokens"], 0)
+        self.assertEqual(
+            decide(results[:35], results[35:]),
+            json.loads((root / "decision.json").read_text()),
+        )
+        load_trace(root / "proposal-trace.json", artifact_root=root)
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            load_trace(run_root / "trace.json", artifact_root=run_root)
