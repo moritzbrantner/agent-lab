@@ -1,0 +1,1 @@
+{"content":"{\"changes\":[{\"op\":\"put\",\"record\":{\"id\":\"b\",\"rank\":1}},{\"op\":\"put\",\"record\":{\"id\":\"a\",\"rank\":1}},{\"op\":\"put\",\"record\":{\"id\":\"b\",\"rank\":0}},{\"id\":\"missing\",\"op\":\"delete\"}]}"}
