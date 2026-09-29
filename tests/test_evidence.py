@@ -213,3 +213,47 @@ class EvidenceTests(unittest.TestCase):
         for result in results:
             run_root = root / "runs" / result["run_id"]
             load_trace(run_root / "trace.json", artifact_root=run_root)
+
+    def test_learned_candidate_retains_real_weights_and_separate_cost(self):
+        import struct
+
+        from agent_lab.experiments import digest
+        from agent_lab.learning import validate_data
+
+        root = ROOT / "evidence/learning/local-v1"
+        data = json.loads((root / "training-data.json").read_text())
+        validate_data(data)
+        training = json.loads((root / "training-cost.json").read_text())
+        self.assertEqual(training["optimizer_steps"], 64)
+        self.assertEqual(len(training["losses"]), 64)
+        self.assertGreater(training["trainable_parameters"], 0)
+        self.assertGreater(training["measurements"]["wall_seconds"], 0)
+        weights = (root / "adapter/adapter_model.safetensors").read_bytes()
+        length = struct.unpack("<Q", weights[:8])[0]
+        header = json.loads(weights[8 : 8 + length])
+        payload = weights[8 + length :]
+        self.assertTrue(
+            any(
+                any(payload[value["data_offsets"][0] : value["data_offsets"][1]])
+                for key, value in header.items()
+                if "lora_B" in key
+            )
+        )
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(results), 50)
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        self.assertEqual(
+            {r["protocol"]["split"] for r in results}, {"development", "held-out"}
+        )
+        report = json.loads((root / "report.json").read_text())
+        self.assertEqual(report["decision"]["status"], "reject")
+        load_trace(root / "trace.json", artifact_root=root)
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            load_trace(run_root / "trace.json", artifact_root=run_root)

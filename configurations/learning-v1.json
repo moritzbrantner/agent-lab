@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model": "Qwen/Qwen2.5-Coder-0.5B-Instruct",
+  "revision": "ea3f2471cf1b1f0db85067f1ef93848e38e88c25",
+  "weights_sha256": "f9523886352217ded3aeeef552b381af79d568c6d49a4b9e423288cea56b0a44",
+  "seed": 17,
+  "examples": 32,
+  "epochs": 2,
+  "batch_size": 1,
+  "learning_rate": 0.001,
+  "lora_rank": 4,
+  "lora_alpha": 8,
+  "lora_dropout": 0,
+  "target_modules": ["q_proj", "v_proj"],
+  "sequence_limit": 256,
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "attention": "eager",
+  "sourceRevision": "e6acb5310afaf15c0cba24f87108f5f4ad1bedc3"
+}
