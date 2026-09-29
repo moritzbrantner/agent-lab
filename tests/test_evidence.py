@@ -69,3 +69,31 @@ class EvidenceTests(unittest.TestCase):
         for result in results:
             run_root = root / "runs" / result["run_id"]
             load_trace(run_root / "trace.json", artifact_root=run_root)
+
+    def test_routing_evidence_accounts_for_rejected_attempts(self):
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/routing/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        manifest = json.loads((root / "manifest.json").read_text())
+        self.assertEqual(digest(results), manifest["results_sha256"])
+        report = json.loads((root / "report.json").read_text())
+        self.assertEqual(report["cheap-first"]["passed"], 5)
+        self.assertGreater(
+            report["cheap-first"]["summary"]["generated_tokens"]["mean"],
+            report["single-strong"]["summary"]["generated_tokens"]["mean"],
+        )
+        for result in results:
+            run_root = root / "runs" / result["run_id"]
+            trace = load_trace(run_root / "trace.json", artifact_root=run_root)
+            if result["configuration"]["backend"] == "routing":
+                requests = [
+                    e
+                    for e in trace["events"]
+                    if e["kind"] == "child"
+                    and e["metadata"].get("kind") == "model_request"
+                ]
+                self.assertEqual(len(requests), result["work"]["model_calls"])

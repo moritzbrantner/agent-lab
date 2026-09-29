@@ -60,6 +60,23 @@ class Trace:
             public = {"status": payload["status"]}
         elif kind in ("artifact", "evaluator", "measurements", "authority"):
             public = copy.deepcopy(payload)
+        elif kind in ("routing", "child", "context"):
+            public = {
+                key: payload[key]
+                for key in (
+                    "stage",
+                    "reason",
+                    "model_digest",
+                    "budget_remaining",
+                    "completed_tools",
+                    "child_id",
+                    "kind",
+                    "policy",
+                    "message_count",
+                    "retained_tools",
+                )
+                if key in payload
+            }
         elif kind == "failure":
             public = {"category": payload["category"]}
         self.events.append(
@@ -195,6 +212,7 @@ class Replay:
                 input_tokens=payload.get("input_tokens"),
                 output_tokens=payload.get("output_tokens"),
                 measurements=payload.get("measurements"),
+                model_calls=payload.get("model_calls", 1),
             )
         return Reply.parse(payload)
 

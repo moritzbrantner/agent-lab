@@ -60,6 +60,7 @@ class Reply:
     input_tokens: int | None = None
     output_tokens: int | None = None
     measurements: dict = field(default_factory=dict)
+    model_calls: int = 1
 
     @classmethod
     def parse(cls, value):
@@ -81,12 +82,18 @@ class Reply:
             count = value.get(key)
             if count is not None and (type(count) is not int or count < 0):
                 raise RuntimeFailure("Invalid token count")
+        if (
+            type(value.get("model_calls", 1)) is not int
+            or value.get("model_calls", 1) < 0
+        ):
+            raise RuntimeFailure("Invalid invocation count")
         return cls(
             value.get("content", ""),
             tuple(parsed),
             value.get("input_tokens"),
             value.get("output_tokens"),
             value.get("measurements", {}),
+            value.get("model_calls", 1),
         )
 
 
@@ -94,13 +101,20 @@ class ResponseFailure(RuntimeFailure):
     """A completed but unusable response, retaining its consumed resources."""
 
     def __init__(
-        self, message, *, input_tokens=None, output_tokens=None, measurements=None
+        self,
+        message,
+        *,
+        input_tokens=None,
+        output_tokens=None,
+        measurements=None,
+        model_calls=1,
     ):
         super().__init__(message)
         self.usage = Reply(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             measurements=measurements or {},
+            model_calls=model_calls,
         )
 
 
@@ -157,6 +171,9 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
     Tools are trusted callables, not a sandbox. Sync tools must be finite local
     computations; process/network tools must implement async cancellation bounds.
     """
+    observer = getattr(adapter, "observe", None)
+    if observer is not None:
+        observer(emit)
     if not state.messages:
         state.messages.append({"role": "user", "content": state.task})
     state.status = "running"
@@ -173,6 +190,7 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                 },
             )
             for attempt in range(config.max_retries + 1):
+                request_invocations = getattr(adapter, "invocation_count", None)
                 state.model_calls += 1
                 emit("model_request", {"messages": copy.deepcopy(messages)})
                 try:
@@ -187,6 +205,7 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                     await asyncio.sleep(config.retry_delay * 2**attempt)
                 except ResponseFailure as error:
                     state.steps += 1
+                    state.model_calls += error.usage.model_calls - 1
                     emit("model_response", {**asdict(error.usage), "failure": True})
                     for name in ("input_tokens", "output_tokens"):
                         old, new = getattr(state, name), getattr(error.usage, name)
@@ -197,9 +216,14 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                         )
                     raise
                 except Exception, asyncio.CancelledError:
+                    if request_invocations is not None:
+                        state.model_calls += (
+                            adapter.invocation_count - request_invocations - 1
+                        )
                     state.input_tokens = state.output_tokens = None
                     raise
             state.steps += 1
+            state.model_calls += reply.model_calls - 1
             emit("model_response", asdict(reply))
             for name in ("input_tokens", "output_tokens"):
                 old, new = getattr(state, name), getattr(reply, name)
