@@ -78,7 +78,7 @@ def memory_snapshot():
         vram = sum(
             int(memory.strip()) * 1024 * 1024
             for pid, memory in allocations
-            if int(pid.strip()) in backend_pids
+            if int(pid.strip()) in backend_pids | {os.getpid()}
         )
         return ram, vram
     except ValueError:
@@ -226,7 +226,7 @@ class Telemetry:
             ),
             (
                 "peak_vram_bytes",
-                "sampled:nvidia-smi/ollama-process-tree-allocations/200ms",
+                "sampled:nvidia-smi/harness+ollama-process-tree/200ms",
             ),
         ):
             if self.values[key] is not None:
