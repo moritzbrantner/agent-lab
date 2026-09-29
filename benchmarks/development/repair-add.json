@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "repair-add",
+  "version": 1,
+  "split": "development",
+  "category": "repository-modification",
+  "input": {
+    "source": "def add(a, b):\n    return a - b\n"
+  },
+  "tools": [
+    "repair"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "repair",
+        "arguments": {
+          "source": "def add(a, b):\n    return a - b\n"
+        }
+      }
+    ]
+  ],
+  "expected": "def add(a, b):\n    return a + b\n",
+  "instruction": "Fix the subtraction bug using repair. Final content must be the complete source with its final newline.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

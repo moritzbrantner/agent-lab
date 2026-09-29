@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "id": "sort-records",
+  "version": 1,
+  "split": "development",
+  "category": "tool-transformation",
+  "input": {
+    "records": [
+      {
+        "id": "b",
+        "rank": 1
+      },
+      {
+        "id": "a",
+        "rank": 1
+      },
+      {
+        "id": "c",
+        "rank": 0
+      }
+    ]
+  },
+  "tools": [
+    "sort"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "sort",
+        "arguments": {
+          "records": [
+            {
+              "id": "b",
+              "rank": 1
+            },
+            {
+              "id": "a",
+              "rank": 1
+            },
+            {
+              "id": "c",
+              "rank": 0
+            }
+          ]
+        }
+      }
+    ]
+  ],
+  "expected": "[{\"id\":\"c\",\"rank\":0},{\"id\":\"a\",\"rank\":1},{\"id\":\"b\",\"rank\":1}]",
+  "instruction": "Use sort to order records by rank then id. Final content must be compact JSON with sorted object keys.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

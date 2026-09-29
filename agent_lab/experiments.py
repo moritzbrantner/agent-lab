@@ -106,15 +106,25 @@ def summarize(runs):
     repeats = set()
     for run in runs:
         validate_result(run)
-        for key in ("task", "configuration", "hardware", "software"):
+        for key in ("task", "hardware", "software"):
             if run[key] != runs[0][key]:
                 raise ValueError(f"Mixed {key}")
+        configuration = {
+            key: value for key, value in run["configuration"].items() if key != "seed"
+        }
+        first_configuration = {
+            key: value
+            for key, value in runs[0]["configuration"].items()
+            if key != "seed"
+        }
+        if configuration != first_configuration:
+            raise ValueError("Mixed configuration")
         protocol = {k: v for k, v in run["protocol"].items() if k != "repeat"}
         first = {k: v for k, v in runs[0]["protocol"].items() if k != "repeat"}
         if protocol != first or run["protocol"]["repeat"] in repeats:
             raise ValueError("Mixed protocol or duplicate repeat")
         repeats.add(run["protocol"]["repeat"])
-    result = {}
+    result = {"sampling_seeds": [run["configuration"].get("seed") for run in runs]}
     for key in (*WORK, *MEASUREMENTS, "score"):
         group = (
             "work"

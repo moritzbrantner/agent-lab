@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "batch-sum",
+  "version": 1,
+  "split": "development",
+  "category": "long-running",
+  "input": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        4,
+        5,
+        6
+      ],
+      [
+        7,
+        8,
+        9
+      ]
+    ]
+  },
+  "tools": [
+    "sum"
+  ],
+  "fixture_plan": [
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            4,
+            5,
+            6
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "name": "sum",
+        "arguments": {
+          "numbers": [
+            7,
+            8,
+            9
+          ]
+        }
+      }
+    ]
+  ],
+  "expected": "45",
+  "instruction": "Call sum once per batch, then total the tool results. Final content is the decimal integer.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}

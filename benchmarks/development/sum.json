@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "sum",
+  "version": 1,
+  "split": "development",
+  "category": "structured-reasoning",
+  "input": {
+    "numbers": [
+      13,
+      29,
+      7
+    ]
+  },
+  "tools": [],
+  "fixture_plan": [],
+  "expected": "49",
+  "instruction": "Compute the sum of the numbers. Final content is the decimal integer.",
+  "evaluator": "exact-v1",
+  "reference": "fixture-v1",
+  "budgets": {
+    "steps": 8,
+    "tool_calls": 16
+  },
+  "repeat_policy": {
+    "deterministic": 1,
+    "stochastic": 5
+  }
+}
