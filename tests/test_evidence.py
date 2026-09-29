@@ -97,3 +97,31 @@ class EvidenceTests(unittest.TestCase):
                     and e["metadata"].get("kind") == "model_request"
                 ]
                 self.assertEqual(len(requests), result["work"]["model_calls"])
+
+    def test_generation_evidence_retains_every_candidate(self):
+        from agent_lab.experiments import digest
+
+        root = ROOT / "evidence/generation/local-v1"
+        results = [
+            json.loads(line)
+            for line in (root / "results.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(
+            digest(results),
+            json.loads((root / "manifest.json").read_text())["results_sha256"],
+        )
+        self.assertEqual(len(results), 10)
+        for label in ("single", "regenerate"):
+            for repeat in range(6):
+                run_root = root / label / str(repeat)
+                report = json.loads((run_root / "report.json").read_text())
+                result = validate_result(report["result"])
+                load_trace(run_root / "trace.json", artifact_root=run_root)
+                self.assertEqual(
+                    result["work"]["generated_tokens"],
+                    sum(c["work"]["generated_tokens"] for c in report["candidates"]),
+                )
+                for candidate in report["candidates"]:
+                    child = run_root / "candidates" / candidate["run_id"]
+                    trace = load_trace(child / "trace.json", artifact_root=child)
+                    self.assertEqual(trace["parent_run_id"], result["run_id"])
