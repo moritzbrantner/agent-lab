@@ -4,6 +4,7 @@ import asyncio
 import json
 import urllib.error
 import urllib.request
+from dataclasses import replace
 from urllib.parse import urlparse
 
 from agent_lab.experiments import canonical
@@ -44,6 +45,26 @@ class OllamaAdapter:
         ):
             raise ValueError("Ollama endpoint must be loopback HTTP")
         self.endpoint = endpoint.rstrip("/")
+
+    def optimize(self, config, requested):
+        report = {}
+        for name, value in requested.items():
+            if name in ("context_size", "gpu_layers"):
+                minimum = 1 if name == "context_size" else 0
+                if type(value) is not int or not minimum <= value <= 131072:
+                    raise ValueError("Invalid optimization bound")
+                config = (
+                    replace(config, context_size=value)
+                    if name == "context_size"
+                    else replace(config, options={**config.options, "num_gpu": value})
+                )
+                report[name] = {"status": "applied", "value": value}
+            else:
+                report[name] = {
+                    "status": "unavailable",
+                    "reason": "no measured control for pinned backend/model",
+                }
+        return config, report
 
     @staticmethod
     def _message(message):
