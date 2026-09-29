@@ -41,7 +41,8 @@
           "sum",
           "sort",
           "lookup",
-          "repair"
+          "repair",
+          "index"
         ]
       }
     },
