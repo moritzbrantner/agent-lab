@@ -74,6 +74,7 @@ class ArchiveTests(unittest.TestCase):
 class PeriodicRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_survivors_receive_protected_broader_fixture_evaluation(self):
         from agent_lab.benchmarks import benchmark, discover, fixture_adapter
+        from agent_lab.telemetry import Telemetry
 
         with tempfile.TemporaryDirectory() as directory:
             archive = Archive(Path(directory) / "archive")
@@ -83,7 +84,13 @@ class PeriodicRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "software": {"runtime": "fixture"},
             }
             initial = [
-                await benchmark(task, fixture_adapter(task), config, **environment)
+                await benchmark(
+                    task,
+                    fixture_adapter(task),
+                    config,
+                    telemetry=Telemetry(periodic=False, memory_probe=lambda: (100, 0)),
+                    **environment,
+                )
                 for task in [discover("development")[0], discover("held-out")[0]]
             ]
             archive.add(config, initial, mutation="fixture root")
