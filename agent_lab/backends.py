@@ -36,7 +36,7 @@ RESPONSE_SCHEMA = {
 
 
 class OllamaAdapter:
-    def __init__(self, endpoint="http://127.0.0.1:11434"):
+    def __init__(self, endpoint="http://127.0.0.1:11434", *, response_schema=None):
         parsed = urlparse(endpoint)
         if parsed.scheme != "http" or parsed.hostname not in (
             "127.0.0.1",
@@ -45,6 +45,7 @@ class OllamaAdapter:
         ):
             raise ValueError("Ollama endpoint must be loopback HTTP")
         self.endpoint = endpoint.rstrip("/")
+        self.response_schema = response_schema or RESPONSE_SCHEMA
 
     def optimize(self, config, requested):
         report = {}
@@ -97,7 +98,7 @@ class OllamaAdapter:
         body = {
             "model": config.model,
             "stream": False,
-            "format": RESPONSE_SCHEMA,
+            "format": self.response_schema,
             "options": options,
             "messages": [self._message(message) for message in messages],
         }
