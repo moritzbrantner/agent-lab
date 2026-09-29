@@ -160,18 +160,25 @@ class AgentState:
     output_tokens: int | None = 0
     pending_calls: list[dict] = field(default_factory=list)
     working_memory: list[dict] = field(default_factory=list)
+    active_call: dict | None = None
+    request_in_flight: bool = False
 
 
 def _ignore_event(kind, payload):
     """Default hook intentionally retains no content."""
 
 
-async def run(adapter, tools, config, state, emit=_ignore_event):
-    """Run until completion; failures/cancellation propagate with retained state.
+async def run(adapter, tools, config, state, emit=_ignore_event, *, checkpoint=None):
+    """Bounded orchestration; optional durable hooks run at authoritative boundaries."""
 
-    Tools are trusted callables, not a sandbox. Sync tools must be finite local
-    computations; process/network tools must implement async cancellation bounds.
-    """
+    def save(stage):
+        if checkpoint is not None:
+            checkpoint(stage, state)
+
+    if state.status == "completed":
+        return state
+    if state.active_call is not None:
+        raise RuntimeFailure("Ambiguous tool action requires explicit recovery")
     observer = getattr(adapter, "observe", None)
     if observer is not None:
         observer(emit)
@@ -180,7 +187,36 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
     state.status = "running"
     emit("state", {"status": state.status, "configuration": asdict(config)})
     try:
-        while state.steps < config.max_steps:
+        while state.pending_calls or state.steps < config.max_steps:
+            if state.pending_calls:
+                call = ToolCall(**state.pending_calls[0])
+                if call.name not in tools:
+                    raise RuntimeFailure(f"Unknown tool: {call.name}")
+                if state.tool_calls >= config.max_tool_calls:
+                    raise RuntimeFailure("Tool budget exhausted")
+                state.active_call = asdict(call)
+                state.tool_calls += 1
+                emit("tool_request", asdict(call))
+                save("tool_started")
+                value = tools[call.name](copy.deepcopy(call.arguments))
+                if inspect.isawaitable(value):
+                    async with asyncio.timeout(config.request_timeout):
+                        value = await value
+                state.working_memory.append(
+                    {
+                        "name": call.name,
+                        "arguments": copy.deepcopy(call.arguments),
+                        "result": copy.deepcopy(value),
+                    }
+                )
+                state.messages.append(
+                    {"role": "tool", "name": call.name, "content": value}
+                )
+                state.pending_calls.pop(0)
+                state.active_call = None
+                emit("tool_result", {"name": call.name, "value": value})
+                save("tool_completed")
+                continue
             messages = project_context(state, config.context_policy)
             emit(
                 "context",
@@ -193,18 +229,24 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
             for attempt in range(config.max_retries + 1):
                 request_invocations = getattr(adapter, "invocation_count", None)
                 state.model_calls += 1
+                state.request_in_flight = True
                 emit("model_request", {"messages": copy.deepcopy(messages)})
+                save("request_started")
                 try:
                     async with asyncio.timeout(config.request_timeout):
                         reply = await adapter.complete(copy.deepcopy(messages), config)
+                    state.request_in_flight = False
                     break
                 except TransientModelError as error:
+                    state.request_in_flight = False
                     if state.retries >= config.max_retries:
                         raise RuntimeFailure("Retry budget exhausted") from error
                     state.retries += 1
                     emit("retry", {"reason": str(error), "attempt": attempt + 1})
+                    save("retry")
                     await asyncio.sleep(config.retry_delay * 2**attempt)
                 except ResponseFailure as error:
+                    state.request_in_flight = False
                     state.steps += 1
                     state.model_calls += error.usage.model_calls - 1
                     emit("model_response", {**asdict(error.usage), "failure": True})
@@ -225,7 +267,6 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                     raise
             state.steps += 1
             state.model_calls += reply.model_calls - 1
-            emit("model_response", asdict(reply))
             for name in ("input_tokens", "output_tokens"):
                 old, new = getattr(state, name), getattr(reply, name)
                 setattr(
@@ -240,40 +281,26 @@ async def run(adapter, tools, config, state, emit=_ignore_event):
                     "calls": [asdict(call) for call in reply.calls],
                 }
             )
+            state.pending_calls = [asdict(call) for call in reply.calls]
+            emit("model_response", asdict(reply))
             if not reply.calls:
                 state.output = reply.content
                 state.status = "completed"
                 emit("state", {"status": state.status})
+                save("completed")
                 return state
             if state.tool_calls + len(reply.calls) > config.max_tool_calls:
                 raise RuntimeFailure("Tool budget exhausted")
-            for call in reply.calls:
-                if call.name not in tools:
-                    raise RuntimeFailure(f"Unknown tool: {call.name}")
-                emit("tool_request", asdict(call))
-                value = tools[call.name](copy.deepcopy(call.arguments))
-                if inspect.isawaitable(value):
-                    async with asyncio.timeout(config.request_timeout):
-                        value = await value
-                state.tool_calls += 1
-                state.working_memory.append(
-                    {
-                        "name": call.name,
-                        "arguments": copy.deepcopy(call.arguments),
-                        "result": copy.deepcopy(value),
-                    }
-                )
-                state.messages.append(
-                    {"role": "tool", "name": call.name, "content": value}
-                )
-                emit("tool_result", {"name": call.name, "value": value})
+            save("response")
         raise RuntimeFailure("Step budget exhausted")
     except asyncio.CancelledError:
-        state.status = "cancelled"
+        if state.status != "completed":
+            state.status = "cancelled"
         emit("state", {"status": state.status})
+        save("cancelled")
         raise
     except Exception as error:
-        # The run boundary retains failures; tools are never silently retried.
         state.status = "failed"
         emit("failure", {"category": type(error).__name__})
+        save("failed")
         raise
