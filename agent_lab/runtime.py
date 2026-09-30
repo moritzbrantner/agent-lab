@@ -162,6 +162,7 @@ class AgentState:
     working_memory: list[dict] = field(default_factory=list)
     active_call: dict | None = None
     request_in_flight: bool = False
+    request_attempts: int = 0
 
 
 def _ignore_event(kind, payload):
@@ -227,6 +228,9 @@ async def run(adapter, tools, config, state, emit=_ignore_event, *, checkpoint=N
                 },
             )
             for attempt in range(config.max_retries + 1):
+                if state.request_attempts >= config.max_steps + config.max_retries:
+                    raise RuntimeFailure("Request budget exhausted")
+                state.request_attempts += 1
                 request_invocations = getattr(adapter, "invocation_count", None)
                 state.model_calls += 1
                 state.request_in_flight = True

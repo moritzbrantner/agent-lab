@@ -54,9 +54,13 @@ class CheckpointStore:
             or value["schema_version"] != 1
         ):
             raise ValueError("Checkpoint content or authority drift")
-        state = AgentState(**value["state"])
+        stored = value["state"]
+        # Older checkpoints conservatively charge primitive calls as attempts.
+        stored.setdefault("request_attempts", stored["model_calls"])
+        state = AgentState(**stored)
         for name in (
             "steps",
+            "request_attempts",
             "model_calls",
             "tool_calls",
             "retries",
@@ -70,7 +74,8 @@ class CheckpointStore:
                 raise ValueError("Invalid checkpoint counter")
         config = self.identity["configuration"]
         if (
-            state.steps > config["max_steps"]
+            state.request_attempts > config["max_steps"] + config["max_retries"]
+            or state.steps > config["max_steps"]
             or state.retries > config["max_retries"]
             or state.tool_calls > config["max_tool_calls"]
         ):

@@ -106,3 +106,19 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await task
         self.assertEqual(state.status, "cancelled")
+
+    async def test_cancelled_requests_still_exhaust_original_request_budget(self):
+        class Waiting:
+            async def complete(self, messages, config):
+                await asyncio.sleep(30)
+
+        state = AgentState("cancel budget")
+        config = AgentConfig(max_steps=1, max_retries=0)
+        task = asyncio.create_task(run(Waiting(), {}, config, state))
+        await asyncio.sleep(0)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        with self.assertRaises(RuntimeFailure):
+            await run(SequenceAdapter([Reply("must not run")]), {}, config, state)
+        self.assertEqual(state.model_calls, 1)
