@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "scope", "hardware", "configuration", "minimum_repeats", "workloads", "thresholds"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "hardware": {"type": "object", "minProperties": 1},
+    "configuration": {"type": "object", "minProperties": 1},
+    "minimum_repeats": {"type": "integer", "minimum": 5},
+    "workloads": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["task", "protocol", "configuration"],
+        "properties": {
+          "task": {"type": "object", "required": ["id", "version", "fixture_hash"]},
+          "protocol": {"type": "object", "required": ["id", "split"]},
+          "configuration": {"type": "object", "minProperties": 1}
+        }
+      }
+    },
+    "thresholds": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "category", "source", "field", "aggregation", "operator", "limit", "required", "description"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "category": {"type": "string", "minLength": 1},
+          "source": {"enum": ["runs", "proofs"]},
+          "field": {"type": "string", "minLength": 1},
+          "aggregation": {"enum": ["success_rate", "p95", "max", "min", "value"]},
+          "operator": {"enum": [">=", "<="]},
+          "limit": {"type": "number"},
+          "required": {"type": "boolean"},
+          "description": {"type": "string", "minLength": 1},
+          "workloads": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "minimum_tool_calls": {"type": "integer", "minimum": 0}
+        },
+        "allOf": [
+          {"if": {"properties": {"source": {"const": "runs"}}}, "then": {"required": ["workloads"], "properties": {"aggregation": {"enum": ["success_rate", "p95", "max", "min"]}}}},
+          {"if": {"properties": {"source": {"const": "proofs"}}}, "then": {"properties": {"aggregation": {"const": "value"}}}}
+        ]
+      }
+    }
+  }
+}
