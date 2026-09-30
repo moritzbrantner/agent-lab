@@ -63,6 +63,8 @@ class Trace:
         public = {}
         if kind == "state":
             public = {"status": payload["status"]}
+        elif kind in ("tool_request", "tool_result"):
+            public = {"name": payload["name"]} if "name" in payload else {}
         elif kind in ("artifact", "evaluator", "measurements", "authority"):
             public = copy.deepcopy(payload)
         elif kind in ("routing", "child", "context"):
