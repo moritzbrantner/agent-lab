@@ -15,3 +15,8 @@ validates the [result contract](schemas/result-v1.json). Commands `compare` and
 Start a [local workspace](docs/workspace.md) with
 `uv run --locked python -m agent_lab.workspace --help`. Sessions retain project
 context, attachments, permission decisions, tool activity, and recoverable runs.
+
+[Fixed-hardware release thresholds](docs/releases.md) report pass, fail, or
+unavailable on explicit workloads. The research roadmap is implemented; release
+readiness depends on measured correctness and resources, with negative results
+retained alongside successful experiments.

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "repository-unknown-usage",
+  "version": 1,
+  "source_repository": "https://github.com/moritzbrantner/agent-lab",
+  "source_commit": "59fe67036e5a233931fd791c649033d5c090c912",
+  "source_path": "agent_lab/runtime.py",
+  "known_fix_commit": "ccd509fc658abc7816a7716160dc8f8c038af426",
+  "allowed_files": [
+    "runtime.py"
+  ],
+  "checker": "unknown-usage-properties-v1",
+  "description": "Failed or cancelled inference must mark spent token work unknown, preserving completed response and tool-failure accounting.",
+  "files": {
+    "runtime.py": "8e868c5139cf2f67a396196d9a4b2558608bf25837b30e79651d22220907a780",
+    "pyproject.toml": "2ca10c129844d5f6892088492957c780b58ea2c2f452a1af871d67241d8d34e8",
+    "AGENTS.md": "8bf73f4882cf2a8252f0074f34f27b789faa9c8c2612b20522dee34d1c83e073"
+  }
+}

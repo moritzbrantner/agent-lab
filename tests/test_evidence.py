@@ -8,6 +8,76 @@ from agent_lab.trace import load_trace
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_fixed_hardware_release_report_and_all_artifacts(self):
+        from agent_lab.release import load_bundle
+
+        root = ROOT / "evidence/release/local-v1"
+        profile = json.loads(
+            (ROOT / "configurations/release-thresholds-v1.json").read_text()
+        )
+        report = load_bundle(profile, root)
+        self.assertEqual(report, json.loads((root / "report.json").read_text()))
+        self.assertEqual(report["samples"], 50)
+        self.assertEqual(report["status"], "fail")
+        self.assertFalse(report["ready"])
+        statuses = {t["id"]: t["status"] for t in report["thresholds"]}
+        self.assertEqual(statuses["held-out"], "fail")
+        self.assertEqual(statuses["effective-context"], "unavailable")
+        self.assertEqual(statuses["energy"], "unavailable")
+        self.assertTrue(
+            all(
+                statuses[name] == "pass"
+                for name in ("recovery", "offline", "bounded-resume")
+            )
+        )
+
+    def test_release_bundle_rejects_changed_or_unbound_artifacts(self):
+        import shutil
+        import tempfile
+
+        from agent_lab.release import load_bundle
+
+        source = ROOT / "evidence/release/local-v1"
+        profile = json.loads((source / "profile.json").read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "bundle"
+            shutil.copytree(source, root)
+            results = root / "results.jsonl"
+            original = results.read_bytes()
+            results.write_bytes(original + b"\n")
+            with self.assertRaisesRegex(ValueError, "artifact drift"):
+                load_bundle(profile, root)
+            results.write_bytes(original)
+            manifest_path = root / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            sample = json.loads(original.splitlines()[0])
+            del manifest["files"][f"runs/{sample['run_id']}/trace.json"]
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "Unbound release"):
+                load_bundle(profile, root)
+
+    def test_workspace_walkthrough_configuration_and_completed_actions(self):
+        from agent_lab.experiments import digest
+        from agent_lab.workspace_store import Workspace
+
+        root = ROOT / "evidence/workspace/local-v1"
+        report = json.loads((root / "report.json").read_text())
+        self.assertTrue(all(report["checks"].values()))
+        workspace = Workspace(root / "history")
+        inspected = workspace.inspect(report["session_id"])
+        self.assertEqual(inspected["state"]["status"], "completed")
+        self.assertEqual(inspected["state"]["tool_calls"], 1)
+        self.assertEqual(
+            digest(inspected["configuration"]), report["configuration_sha256"]
+        )
+        self.assertEqual(
+            inspected["configuration"],
+            json.loads((root / "exported-configuration.json").read_text()),
+        )
+        pilot = json.loads((root / "model-pilot.json").read_text())
+        self.assertTrue(pilot["passed"])
+        self.assertEqual(workspace.inspect(pilot["session_id"])["state"]["output"], "6")
+
     def test_immutable_baselines_and_artifacts(self):
         root = ROOT / "evidence/baselines/local-v1"
         self.assertEqual(verify_bundle(root)["samples"], 120)
