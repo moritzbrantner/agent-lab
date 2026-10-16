@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Recorded evidence runs and benchmark repositories are hashed, frozen fixtures; updating their pins causes release artifact drift.",
+  "extends": [
+    "github>moritzbrantner/coding-agent-conventions"
+  ],
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
